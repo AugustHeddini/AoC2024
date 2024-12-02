@@ -7,6 +7,7 @@ import (
 	"strings"
 	"strconv"
 	"sync"
+	"slices"
 )
 
 func check(e error) {
@@ -55,16 +56,34 @@ func check_values(a int, b int, increasing bool) bool {
 	return a != b && abs(a-b) < 4
 }
 
-func is_safe(report []int, ch chan bool) {
+func is_safe(report []int, dampener bool) bool {
 	increasing := report[0] < report[1]
 
 	for i := 0; i < len(report) - 1; i++ {
 		if !check_values(report[i], report[i+1], increasing) {
-			ch <- false
-			return
+			if dampener {
+				if i != 0 {
+					sans_prev := slices.Concat(report[:i-1], report[i:])
+					if is_safe(sans_prev, false) {
+						return true
+					}
+				}
+
+				sans_this := slices.Concat(report[:i], report[i+1:])
+				if is_safe(sans_this, false) {
+					return true
+				}
+
+
+				sans_next := slices.Concat(report[:i+1], report[i+2:])
+				if is_safe(sans_next, false) {
+					return true
+				}
+			}
+			return false
 		}
 	}
-	ch <- true
+	return true
 }
 
 func check_reports(reports [][]int) int {
@@ -74,7 +93,7 @@ func check_reports(reports [][]int) int {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			is_safe(report, ch)
+			ch <- is_safe(report, true)
 		}()
 	}
 
