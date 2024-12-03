@@ -8,6 +8,7 @@ import (
     "strconv"
     "sync"
     "slices"
+    "time"
 )
 
 func check(e error) {
@@ -113,6 +114,7 @@ func check_reports(reports [][]int) int {
 }
 
 func main() {
+    start := time.Now()
     input, err := os.Open("input")
     check(err)
 
@@ -122,4 +124,5 @@ func main() {
 
     fmt.Print("Safe count: ")
     fmt.Println(safe_report_count)
+    fmt.Printf("Time: %s\n", time.Since(start))
 }
