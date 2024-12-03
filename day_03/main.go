@@ -7,6 +7,7 @@ import (
     "regexp"
     "strconv"
     "strings"
+    "time"
 )
 
 func Sum(vals []int) int {
@@ -60,6 +61,7 @@ func parseInputMuls(input *os.File) []int {
 }
 
 func main() {
+    start := time.Now()
     input, err := os.Open("input")
     if err != nil {
         panic(err)
@@ -68,4 +70,5 @@ func main() {
 
     listOfMuls := parseInputMuls(input)
     fmt.Printf("Sum of multiplications: %d\n", Sum(listOfMuls))
+    fmt.Printf("Time: %s\n", time.Since(start))
 }
