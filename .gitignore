@@ -25,3 +25,7 @@ input
 
 # env file
 .env
+
+Cargo.lock
+
+target/
