@@ -53,81 +53,63 @@ impl Guard {
         }
     }
 
-    fn step(&mut self) -> (u16, u16) {
-        match self.dir {
-            Direction::UP => self.position.1 -= 1,
-            Direction::DOWN => self.position.1 += 1,
-            Direction::LEFT => self.position.0 -= 1,
-            Direction::RIGHT => self.position.0 += 1,
+    fn step(&mut self) {
+        self.position = self.next_step();
+    }
+
+    fn next_step(&self) -> (u16, u16) {
+        return match self.dir {
+            Direction::UP => (self.position.0, self.position.1.wrapping_sub(1)),
+            Direction::DOWN => (self.position.0, self.position.1 + 1),
+            Direction::LEFT => (self.position.0.wrapping_sub(1), self.position.1),
+            Direction::RIGHT => (self.position.0 + 1, self.position.1)
         }
-        return self.position;
     }
 }
 
 impl Lab {
-    fn step_guard(&mut self, guard: &mut Guard, looping: bool) -> bool {
-        let next_pos: (i16, i16) = match guard.dir {
-            Direction::UP => (guard.position.0 as i16, guard.position.1 as i16 - 1),
-            Direction::DOWN => (guard.position.0 as i16, guard.position.1 as i16 + 1),
-            Direction::LEFT => (guard.position.0 as i16 - 1, guard.position.1 as i16),
-            Direction::RIGHT => (guard.position.0 as i16 + 1, guard.position.1 as i16),
-        };
+    fn step_guard(&mut self, guard: &mut Guard, looping: bool, visited: &HashSet<(u16, u16)>) -> bool {
+        let mut next_pos = guard.next_step();
         if self.pos_in_dims(next_pos) {
-            if self
-                .obstacles
-                .contains(&(next_pos.0 as u16, next_pos.1 as u16))
-            {
+            while self.obstacles.contains(&next_pos) {
                 guard.turn();
-            } else if looping {
-                self.search_loop(&guard);
+                next_pos = guard.next_step();
+            } 
+            if looping && !visited.contains(&next_pos) {
+                self.search_loop(guard.clone(), next_pos, &visited);
             }
             guard.step();
             return true;
-        } else {
-            return false;
+        } 
+        return false;
+    }
+
+    fn pos_in_dims(&self, pos: (u16, u16)) -> bool {
+        return pos.0 < self.dims.0 as u16
+            && pos.1 < self.dims.1 as u16;
+    }
+
+    fn search_loop(&mut self, mut ghost_guard: Guard, obstacle: (u16, u16), visited: &HashSet<(u16, u16)>) {
+        if obstacle == self.guard_start {
+            return;
         }
-    }
-
-    fn pos_in_dims(&self, pos: (i16, i16)) -> bool {
-        return pos.0 < self.dims.0 as i16
-            && pos.1 < self.dims.1 as i16
-            && pos.0 >= 0
-            && pos.1 >= 0;
-    }
-
-    fn search_loop(&mut self, guard: &Guard) {
-        let start_pos = guard.position;
-        let start_dir = guard.dir;
+        let orig_obstacles = self.obstacles.clone();
+        self.obstacles.insert(obstacle);
 
         let mut ghost_visited = HashSet::<((u16, u16), Direction)>::new();
-        let mut ghost_guard = guard.clone();
-        // let mut ghost_guard = Guard { position: self.guard_start, dir: self.guard_start_dir };
-        ghost_visited.insert((ghost_guard.position, ghost_guard.dir));
-        ghost_guard.turn();
-        while self.step_guard(&mut ghost_guard, false) {
-            // println!("Comparing position {:?} to {:?} and direction {:?} to {:?}", ghost_guard.position, start_pos, ghost_guard.dir, start_dir);
 
-            if ghost_guard.position == start_pos && ghost_guard.dir == start_dir
-                 // ghost_visited.contains(&(ghost_guard.position, ghost_guard.dir))
-            {
-                let loop_obstacle = match guard.dir {
-                    Direction::UP => (guard.position.0, guard.position.1 - 1),
-                    Direction::DOWN => (guard.position.0, guard.position.1 + 1),
-                    Direction::LEFT => (guard.position.0 - 1, guard.position.1),
-                    Direction::RIGHT => (guard.position.0 + 1, guard.position.1),
-                };
-                if loop_obstacle != self.guard_start {
-                    // println!("Inserting loop obstacle at {:?} with direction {:?}", loop_obstacle, guard.dir);
-                    self.loops.insert(loop_obstacle);
+        while self.step_guard(&mut ghost_guard, false, visited) {
+
+            if ghost_visited.contains(&(ghost_guard.position, ghost_guard.dir)) {
+                if obstacle != self.guard_start {
+                    self.loops.insert(obstacle);
                 }
-                break;
-            }
-            if ghost_visited.contains(&(ghost_guard.position,   ghost_guard.dir)) {
                 break;
             }
 
             ghost_visited.insert((ghost_guard.position, ghost_guard.dir));
         }
+        self.obstacles = orig_obstacles;
     }
 }
 
@@ -172,37 +154,10 @@ fn parse_input(filename: &str) -> (Lab, Guard) {
 
 fn run_simulaton(lab: &mut Lab, guard: &mut Guard) -> HashSet<(u16, u16)> {
     let mut visited = HashSet::<(u16, u16)>::new();
-    let mut loop_allow = true;
-    while lab.step_guard(guard, false) {
-        loop_allow = !visited.contains(&guard.position);
+    while lab.step_guard(guard, true, &visited) {
         visited.insert(guard.position);
     }
     return visited;
-}
-
-fn run_loop_search(lab: &mut Lab, guard: &mut Guard, visited_tiles: &HashSet<(u16, u16)>) {
-
-    let orig_obstacles = lab.obstacles.clone();
-    for tile in visited_tiles {
-        if *tile == lab.guard_start {
-            continue;
-        }
-        
-        lab.obstacles.insert(*tile);
-        guard.position = lab.guard_start;
-        guard.dir = lab.guard_start_dir;
-
-        let mut visited = HashSet::<((u16, u16), Direction)>::new();
-        while lab.step_guard(guard, false) {
-            if visited.contains(&(guard.position, guard.dir)) {
-                lab.loops.insert(*tile);
-                break;
-            }
-            visited.insert((guard.position, guard.dir));
-        }
-
-        lab.obstacles = orig_obstacles.clone();
-    }
 }
 
 fn main() {
@@ -227,7 +182,6 @@ fn main() {
         println!();
     }
 
-    run_loop_search(&mut lab, &mut guard, &visited_tiles);
     println!("Guard visited {} tiles", visited_tiles.len());
     println!("Found {} loops", lab.loops.len());
 
