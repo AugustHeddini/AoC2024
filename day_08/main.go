@@ -50,14 +50,18 @@ func findAntinodes(antennas map[byte][]coord, boundary coord) map[coord]bool {
     for _, coords := range antennas {
         for i := 0; i < len(coords); i++ {
             for j := i + 1; j < len(coords); j++ {
+                addUnique(coords[i], antinodes)
+                addUnique(coords[j], antinodes)
                 diff := sub(coords[i], coords[j])
                 over := add(coords[i], diff)
-                under := sub(coords[j], diff)
-                if gteq(over, 0) && smallerThan(over, boundary) {
+                for gteq(over, 0) && smallerThan(over, boundary) {
                     addUnique(over, antinodes)
+                    over = add(over, diff)
                 } 
-                if gteq(under, 0) && smallerThan(under, boundary) {
+                under := sub(coords[j], diff)
+                for gteq(under, 0) && smallerThan(under, boundary) {
                     addUnique(under, antinodes)
+                    under = sub(under, diff)
                 }
             }
         }
