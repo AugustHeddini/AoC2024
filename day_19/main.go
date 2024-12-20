@@ -10,7 +10,7 @@ import (
 )
 
 func fitsTowel(pattern []byte, idx int, towel []byte) bool {
-    if idx + len(towel) >= len(pattern) {
+    if idx + len(towel) > len(pattern) {
         return false
     }
     for i, b := range towel {
@@ -33,6 +33,42 @@ func testTowels(towels [][]byte, pattern []byte, idx int) bool {
         } 
     }
     return false
+}
+
+func testCombinations(towels [][]byte, pattern []byte) (count int) {
+    waysToReach := map[int]int{}
+    waysToReach[0] = 1
+    for i := range pattern {
+        for _, towel := range towels {
+            if fitsTowel(pattern, i, towel) {
+                waysToReach[i + len(towel)] += waysToReach[i]
+            }
+        }
+    }
+
+    count = waysToReach[len(pattern)]
+    return
+}
+
+func validateCombinationsParallel(towels [][]byte, patterns [][]byte) (valid int) {
+    var wg sync.WaitGroup
+    ch := make(chan int)
+    for _, pattern := range patterns {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            ch <- testCombinations(towels, pattern)
+        }()
+    }
+    go func() {
+        wg.Wait()
+        close(ch)
+    }()
+
+    for paths := range ch {
+        valid += paths
+    }
+    return
 }
 
 func validateArrangements(towels [][]byte, patterns [][]byte) (valid int) {
@@ -105,7 +141,8 @@ func main() {
 
     towels, patterns := parseInput(input)
     // fmt.Printf("Towels %c\nPatterns %c\n", towels, patterns)
-    validPatterns := validateArrangements(towels, patterns)
+    // validPatterns := validateArrangements(towels, patterns)
+    validPatterns := validateCombinationsParallel(towels, patterns)
 
     fmt.Printf("Found %d valid patterns\n", validPatterns)
 
