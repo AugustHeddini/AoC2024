@@ -40,26 +40,24 @@ func (wh *warehouse) swap(src pair, dst pair) {
     wh.set(src, temp)
 }
 
-func (wh *warehouse) pushBox(leftHalf pair, dir pair, depth int) (map[int][]func(), bool) {
-    rightHalf := leftHalf
-    left := true
-    if wh.get(leftHalf) == '[' {
-        rightHalf.add(pair{ 1, 0 })
+func (wh *warehouse) getBoxCoords(loc pair) (left pair, right pair) {
+    if wh.get(loc) == '[' {
+        left = loc
+        right = add(loc, pair{ 1, 0 })
     } else {
-        rightHalf.add(pair{ -1, 0 })
-        left = false
+        left = add(loc, pair{ -1, 0 })
+        right = loc
     }
-    if !left {
-        temp := leftHalf
-        leftHalf = rightHalf
-        rightHalf = temp
-    }
+    return 
+}
+
+func (wh *warehouse) pushBox(loc pair, dir pair, depth int) (map[int][]func(), bool) {
+    leftHalf, rightHalf := wh.getBoxCoords(loc)
+    nextLeft := add(leftHalf, dir)
+    nextRight := add(rightHalf, dir)
 
     blocked := false
     callbacks := map[int][]func(){}
-    nextLeft := add(leftHalf, dir)
-    nextRight := add(rightHalf, dir)
-    // fmt.Printf("Pushing box at %d, %d into %d, %d with values %c, %c\n", leftHalf, rightHalf, nextLeft, nextRight, wh.get(nextLeft), wh.get(nextRight))
     if wh.get(nextLeft) == '#' || wh.get(nextRight) == '#' {
         return nil, true
     }
@@ -139,14 +137,10 @@ func add(a pair, b pair) pair {
 func printMap(wh warehouse) {
     fmt.Printf("Warehouse map:\n")
     for y, row := range wh.floor {
-        for x, b := range row {
-            if wh.robot.pos.x == x && wh.robot.pos.y == y {
-                fmt.Printf("@")
-                continue
-            }
-            fmt.Printf("%c", b)
-        }
-        fmt.Println()
+        if wh.robot.pos.y == y {
+            row[wh.robot.pos.x] = '@'
+        }   
+        fmt.Printf("%c\n", row)
     }
 }
 
@@ -175,6 +169,7 @@ func locateRobot(line []byte) int {
 func iterateRobot(moves []pair, wh warehouse) {
     for _, move := range moves {
         // printMap(wh)
+        // wh.step(move)
         wh.stepWide(move)
     }
 }
