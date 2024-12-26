@@ -158,9 +158,9 @@ func (m *maze) unobstructedLine(from coord, to coord) bool {
     return false
 }
 
-func (m *maze) pathfind() []coord {
+func (m *maze) pathfind() ([]coord, map[coord][]coord) {
     distances := map[coord]int{}
-    prev := map[coord]coord{m.start: m.start}
+    prev := map[coord][]coord{m.start: []coord{m.start}}
     queue := []coord{}
     waypointNeighbours := map[coord][]coord{}
     for wp, _ := range m.waypoints {
@@ -187,25 +187,28 @@ func (m *maze) pathfind() []coord {
             return 0
         })
         elem := queue[0]
-        if elem == m.end {
-            break
-        }
+        // if elem == m.end {
+            // break
+        // }
         queue = queue[1:]
 
         for _, n := range waypointNeighbours[elem] {
             newDist := distances[elem] + dist(elem, n)
-            if !isLine(prev[elem], n) {
+            if _, ok := prev[elem]; ok && !isLine(prev[elem][len(prev[elem]) - 1], n) {
                 newDist += 1000
+            }
+            if newDist == distances[n] {
+                prev[n] = append(prev[n], elem)
             }
             if newDist < distances[n] {
                 distances[n] = newDist 
-                prev[n] = elem
+                prev[n] = []coord{elem}
             }
         }
     }
 
     path := []coord{}
-    for elem := m.end; elem != m.start; elem = prev[elem] {
+    for elem := m.end; elem != m.start; elem = prev[elem][0] {
         // fmt.Printf("Backtracing elem %d onto path %d\n", elem, path)
         path = append(path, elem)
     }
@@ -213,7 +216,30 @@ func (m *maze) pathfind() []coord {
 
     fmt.Printf("Found distance to end %d\n", distances[m.end])
 
-    return path
+    return path, prev
+}
+
+func (m *maze) totalVisited(prev map[coord][]coord) int {
+    visited := map[coord]bool{}
+    queue := []coord{m.end}
+    for len(queue) > 0 {
+        curr := queue[0]
+        queue = queue[1:]
+        for _, wp := range prev[curr] {
+            for y := min(curr.y, wp.y); y <= max(curr.y, wp.y); y++ {
+                for x := min(curr.x, wp.x); x <= max(curr.x, wp.x); x++ {
+                    visited[coord{ x, y }] = true
+                }
+            }
+            if wp == m.start {
+                break
+            }
+            if !contains(queue, wp) {
+                queue = append(queue, wp)
+            }
+        }
+    }
+    return len(visited)
 }
 
 func parseInput(input *os.File) maze {
@@ -264,7 +290,9 @@ func main() {
     maze.parseCorners()
     maze.print()
 
-    fmt.Printf("Found path %d\n", maze.pathfind())
+    path, prevList := maze.pathfind()
+    fmt.Printf("Found path %d\n", path)
+    fmt.Printf("Found visited tiles for all shortest paths %d\n", maze.totalVisited(prevList))
 
     fmt.Printf("Elapsed %s\n", time.Since(start))
 }
